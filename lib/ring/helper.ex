@@ -19,6 +19,7 @@ defmodule OverDB.Ring.Helper do
       Connection.push(payload, socket)
       %Rows{page: [page]} = OverDB.Protocol.decode_response(socket, %{set: :list})
       [rpc_address: rpc_address, tokens: tokens, scylla_nr_shards: nr_shards, scylla_msb_ignore: msg_ignore] = page
+      :gen_tcp.close(socket)
       Enum.map(tokens, fn(token) -> {String.to_integer(token), {rpc_address, nr_shards, msg_ignore}} end)
     end
     |> List.flatten() |> ranges()

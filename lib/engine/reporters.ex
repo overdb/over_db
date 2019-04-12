@@ -61,7 +61,7 @@ defmodule OverDB.Engine.Reporter do
     send(pid, {:overloaded, ref})
     {:noreply, [], state}
   end
-  
+
   @spec handle_cast(tuple, map) :: tuple
   def handle_cast({:execute,_size, pid, ref, <<v_f::2-bytes, rest::binary>>}, %{stream_ids: [stream_id | stream_ids], workers: workers} = state) do
     payload = <<v_f::binary, stream_id::16, rest::binary>>

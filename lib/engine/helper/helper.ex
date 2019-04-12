@@ -103,7 +103,6 @@ defmodule OverDB.Engine.Helper do
 
 
   def register_me(0,1,1, name, otp_app) do
-    IO.puts("#{name}")
     :ok = GenStage.call(:"#{otp_app}_preparer",{:register, name})
   end
 
