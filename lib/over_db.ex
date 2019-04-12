@@ -5,13 +5,17 @@ defmodule OverDB do
   @moduledoc """
 
   Documentation for OverDB.
-  docs are WORK IN PROGRESS.
+  docs, OverDB ENGINE APIs and APP API (WIP) WORK IN PROGRESS.
 
   """
 
+  # this is testing for purpose only, a supervision_tree will follow.
   @spec start_simple_topology(atom,atom, integer) :: atom
   def start_simple_topology(otp_app, data_center, sleep \\ 20000) do
+    # GenServers per otp_app ------------
     Monitor.start_link(otp_app: otp_app)
+    Preparer.start_link(otp_app: otp_app)
+    # -----------------------------------
     Process.sleep(sleep)
     reporter_per_shard = Application.get_env(:over_db, otp_app)[:__REPORTERS_PER_SHARD__]
     loggeds = Application.get_env(:over_db, otp_app)[:__LOGGED_PER_SHARD__]
@@ -41,8 +45,6 @@ defmodule OverDB do
             Batcher.start_link(args)
           end
         end
-        # Preparer per otp_app
-        Preparer.start_link(otp_app: otp_app)
         # reporters and senders
         for {partition, range}  <- Helper.gen_stream_ids(reporter_per_shard), conn <- 1..conns, shard <- 0..shards  do
           args = [otp_app: otp_app, conn: conn, shard: shard, range: range, partition: partition, logged: loggeds, unlogged: unloggeds, counter: counters, address: address]
@@ -61,6 +63,11 @@ defmodule OverDB do
       end
     end
 
+  end
+
+  @spec get_reporters_ranges(integer) :: list
+  def get_reporters_ranges(reporter_per_shard) do
+    Helper.gen_stream_ids(reporter_per_shard)
   end
 
 end
