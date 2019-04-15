@@ -133,16 +133,22 @@ defmodule OverDB.Protocol do
   end
 
   @spec decode_response(port, map) :: responses
-  def decode_response(socket, opts) do
+  def decode_response(socket, opts \\ %{}) do
     {:ok, <<_::5-bytes, len::32>> = header} = :gen_tcp.recv(socket, 9)
     {:ok, buffer} = :gen_tcp.recv(socket, len)
     decode_frame(header <> buffer, opts)
   end
 
+  def decode_frame(buffer, opts \\ %{})
   @spec decode_frame(binary, map) :: responses
-  def decode_frame(buffer, opts) do
+  def decode_frame(buffer, opts) when is_binary(buffer) do
     flags = Map.get(opts, :flags, %{ignore: true})
     Frame.decode(buffer, flags) |> decode(opts)
+  end
+
+  @spec decode_frame(term, term) :: term
+  def decode_frame(err?, _) do
+    err?
   end
 
   @spec decode_response(port,Prepared.t, map) :: responses

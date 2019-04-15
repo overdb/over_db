@@ -250,6 +250,11 @@ defmodule OverDB.Protocol.V4.Frames.Frame do
     decode(header, body, flags)
   end
 
+  @spec decode(term, term) :: tuple
+  def decode(err?,_) do
+    {:frame_error, err?}
+  end
+  
   @spec decode(binary, binary, map) :: t
   def decode(<<@response_version, flags, stream_id::16, opcode, length::32>> = header, body , %{ignore: _} = _flag) when is_binary(header) and is_binary(body) do
     %__MODULE__{opcode: type?(opcode), version: 4, flags: decode_flags(flags), stream_id: stream_id, length: length, body: body}

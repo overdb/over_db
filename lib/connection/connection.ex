@@ -1,7 +1,7 @@
 defmodule OverDB.Connection do
 
-  alias OverDB.Protocol.V4.Frames.{Frame, Requests.Startup, Requests.Options, Responses.Supported, Responses.Ready}
-
+  alias OverDB.Protocol.V4.Frames.{Frame, Requests.Startup, Requests.Options}
+  alias OverDB.Protocol
   @sync_opts [packet: :raw, mode: :binary, active: false, buffer: 10000000000] # TODO: remove the buffer tcp_window
   @async_active_true [packet: :raw, mode: :binary, active: true]
   @async_active_n [packet: :raw, mode: :binary, active: 32767]
@@ -25,20 +25,17 @@ defmodule OverDB.Connection do
           :lz4 -> %{"CQL_VERSION" => hd(conn.options[:CQL_VERSION]), "COMPRESSION" => "lz4"}
           :snappy -> %{"CQL_VERSION" => hd(conn.options[:CQL_VERSION]), "COMPRESSION" => "snappy"}
         end
-        |> Startup.new() |> push(conn.socket)
-        recv(conn.socket, options[:strategy]) |> Frame.decode() |>  Ready.decode() |> check(conn)
+        |> Startup.new() |> push(conn.socket) |> recv(options[:strategy])
+        |> Protocol.decode_frame() |> ensure_ready(conn)
       error -> error
     end
-  end
-
-  defp check(:ready, conn) do
-    conn
   end
 
   @spec connect(map) :: t
   defp connect(%{address: address, port: port} =  options) do
     strategy = Map.get(options, :strategy, :async_active_true)
     timeout = Map.get(options, :timeout, @timeout)
+    Process.put(:timeout, timeout)
     conn_status =
       case strategy do
         :async_active_once ->
@@ -51,54 +48,65 @@ defmodule OverDB.Connection do
           :gen_tcp.connect(address, port, @sync_opts, timeout)
       end
     case conn_status do
-      {:ok, socket} -> create(socket, address, port, strategy, get_cql_opts(socket, strategy))
+      {:ok, socket} ->
+        case get_cql_opts(socket, strategy) do
+          {:error, _} = err? ->
+            :gen_tcp.close(socket)
+            err?
+          # TODO: work on supported struct instead of map in the protocol responses.
+          cql_opts ->
+            create(socket, address, port, strategy, cql_opts)
+        end
       _ -> conn_status
     end
   end
 
   @spec get_cql_opts(port, atom) :: map
-  def get_cql_opts(socket, :sync) do
+  def get_cql_opts(socket, strategy) do
     Options.new |> push(socket)
-    recv(socket, :sync) |> Frame.decode() |> Supported.decode()
-  end
-
-
-  @spec get_cql_opts(port, atom) :: map
-  def get_cql_opts(socket, _) do
-    Options.new |> push(socket)
-    receive do
-      {:tcp, _socket, buffer} ->
-         Frame.decode(buffer) |> Supported.decode()
-    end
+    |> recv(strategy) |> Protocol.decode_frame() |> ensure_supported()
   end
 
   @spec push(list | binary, port) :: :ok
   def push(payload, socket) do
-    :gen_tcp.send(socket, payload)
+    case :gen_tcp.send(socket, payload) do
+      :ok ->
+        socket
+      err? -> err?
+    end
   end
 
-  def recv(socket, :sync) do
-    case :gen_tcp.recv(socket, 9) do
+  @spec recv(port, atom) :: binary | atom
+  defp recv(socket, :sync) when is_port(socket) do
+    case :gen_tcp.recv(socket, 9, @timeout) do
       {:ok, header} ->
         body_length = Frame.length(header)
         if body_length != 0 do
-          case :gen_tcp.recv(socket, body_length) do
-            {:ok, body} -> header <> body
-            _ -> :error
+          case :gen_tcp.recv(socket, body_length, @timeout) do
+            {:ok, body} ->
+              header <> body
+            err? -> err?
           end
         else
           header
         end
-      _ -> :error
+      err? ->
+        err?
     end
   end
 
-  def recv(_socket, _) do
+  @spec recv(port, atom) :: binary | atom
+  defp recv(socket, _) when is_port(socket) do
     receive do
       {:tcp, _socket, buffer} ->
          buffer
-      _ -> :error
+      err? -> err?
     end
+  end
+
+  @spec recv(term, term) :: term
+  defp recv(err?, _) do
+    err?
   end
 
   @spec create(port, list, integer, atom, map) :: t
@@ -108,11 +116,23 @@ defmodule OverDB.Connection do
 
 
   @spec connect_by_shard(String.t | integer, map, list) :: t
-  defp connect_by_shard(shard, opts, acc) do
-    shard = to_string(shard)
-    {conn, sockets} = loop(shard, acc, opts)
-    Enum.each(sockets, fn(x) -> :gen_tcp.close(x) end)
-    conn
+  defp connect_by_shard(int_shard, opts, acc) do
+    shard = to_string(int_shard)
+    case connect(opts) do
+      %__MODULE__{options: %{SCYLLA_NR_SHARDS: [nr]}, socket: socket} ->
+        case String.to_integer(nr) do
+          max_nr when int_shard >= max_nr or int_shard < 0 ->
+            :gen_tcp.close(socket)
+            {:error, max_nr-1}
+          _ ->
+            {conn_err?, sockets} = loop(shard, acc, opts)
+            Enum.each(sockets, fn(port) -> :gen_tcp.close(port) end)
+            conn_err?
+        end
+      err? ->
+        err?
+    end
+
   end
 
   @spec loop(String.t, list, map) :: tuple
@@ -121,7 +141,7 @@ defmodule OverDB.Connection do
       {_, _} = error -> {error, acc}
       %__MODULE__{} = conn ->
         {conn, acc}
-      x when is_port(x) -> loop(shard, [x | acc], opts)
+      port when is_port(port) -> loop(shard, [port | acc], opts)
     end
   end
 
@@ -141,10 +161,32 @@ defmodule OverDB.Connection do
   def start_all(otp_app, shard \\ 0) do
     data_centers = Application.get_env(:over_db, otp_app)[:__DATA_CENTERS__]
     for {_, nodes} <- data_centers do
-      for node <- nodes do
-        start(%{address: elem(node, 0), port: elem(node, 1), shard: shard, strategy: :sync})
+      for {address, port} <- nodes do
+        start(%{address: address, port: port, shard: shard, strategy: :sync})
       end
     end |> List.flatten
+  end
+
+  # ensure functions
+
+  @spec ensure_ready(atom, t) :: t
+  defp ensure_ready(:ready, conn) do
+    conn
+  end
+
+  @spec ensure_ready(term, t) :: tuple
+  defp ensure_ready(err?, _) do
+    {:error, err?}
+  end
+
+  @spec ensure_supported(map) :: map
+  defp ensure_supported(%{CQL_VERSION: _} = response) do
+    response
+  end
+
+  @spec ensure_supported(term) :: term
+  defp ensure_supported(err?) do
+    {:error, err?}
   end
 
 end

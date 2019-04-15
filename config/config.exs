@@ -30,3 +30,18 @@ use Mix.Config
 # here (which is why it is important to import them last).
 #
 #     import_config "#{Mix.env()}.exs"
+config :over_db, :core,
+  __USERNAME__: "username", # CQL username for auth
+  __PASSWORD__: "password", # CQL password for auth
+  __DATA_CENTERS__: [
+    dc1: [
+      {'127.0.0.1', 9042},
+    ],
+  ],
+  __RING__: :core_ring,
+  __RECEIVER_PRIORITY__: :high,
+  __REPORTERS_PER_SHARD__: 2,
+  __CONNS_PER_SHARD__: 2,
+  __LOGGED_PER_SHARD__: 1,
+  __UNLOGGED_PER_SHARD__: 1,
+  __COUNTER_PER_SHARD__: 1

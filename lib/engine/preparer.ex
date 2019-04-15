@@ -18,7 +18,7 @@ defmodule OverDB.Engine.Preparer do
   def handle_call({:register, p_name}, _, {map, pids}) do
     {:reply, :ok, {map,[p_name | pids]}}
   end
-  # # TODO: should check if the prepare cql already exist in the map_state to
+  # NOTE: should check if the prepare cql already exist in the map_state to
   # prevent mixing the same prepare request..
   # solution : generating a random ref alongside the cql for each new request.
   def handle_cast({:prepare, cql, prepare_request}, {map, [first | rest] = pids}) do
@@ -37,7 +37,7 @@ defmodule OverDB.Engine.Preparer do
 
   def handle_cast({:full, {cql, _} = cql_ref, buffer}, {map,pids}) do
     map =
-      case Map.get(map, cql_ref) do # # TODO: there is a bug on heavy load.
+      case Map.get(map, cql_ref) do # TODO: there is a bug on heavy load.
         {0, <<>>} ->
           case Protocol.decode_frame(buffer, %{}) do
             %Prepared{id: _} = prepared? ->
