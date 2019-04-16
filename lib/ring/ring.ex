@@ -5,7 +5,6 @@ defmodule OverDB.Ring do
 
 
   def gen_functions(ranges, module, otp_app) do
-
     Module.create(module, [gen_preparer(otp_app), gen_lookup_replicas() | gen_lookup_primary(ranges, otp_app)], Macro.Env.location(__ENV__))
     ranges
   end

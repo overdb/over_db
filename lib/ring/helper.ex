@@ -9,9 +9,10 @@ defmodule OverDB.Ring.Helper do
 
 
   # TODO: adding error handling. dynamicly starting connection with specific IPs.
+  # refactoring the func with error handling (WIP).
   @spec get_all_ranges(atom) :: list
   def get_all_ranges(otp_app) do
-    conns = Connection.start_all(otp_app)
+    {_dead, conns} = Connection.start_all(otp_app)
     payload =
       Query.create("SELECT rpc_address, tokens, scylla_nr_shards, scylla_msb_ignore FROM system.local")
       |> Query.new(%{})
@@ -22,7 +23,7 @@ defmodule OverDB.Ring.Helper do
       :gen_tcp.close(socket)
       Enum.map(tokens, fn(token) -> {String.to_integer(token), {rpc_address, nr_shards, msg_ignore}} end)
     end
-    |> List.flatten() |> ranges()
+    |> List.flatten() |> :lists.usort() |> ranges()
   end
 
   @spec build_ring(list, atom, atom) :: atom

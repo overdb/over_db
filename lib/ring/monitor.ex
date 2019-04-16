@@ -23,5 +23,9 @@ defmodule OverDB.Ring.Monitor do
     {:noreply, state}
   end
 
-  
+  # NOTE: the monitor is WIP
+  # it should have full control over the data_centers(for now only dc1 is supported) and be able to communicate with all the cluster_managers
+  # to dynamicly add or remove nodes as well rebuilding the picture of ring while registering/listening for events(up/down, add/remove),
+  # and we should not forget working on config.exs runtime idea to update the __DATA_CENTERS__ in both(runtime, put_env) with the added/removed nodes,
+  # this way if the application crashed with dynamicly added/remove scylla nodes, then it will rebuild ring with the recent nodes.
 end

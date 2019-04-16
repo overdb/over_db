@@ -34,6 +34,7 @@ defmodule OverDB.Engine.Receiver do
         Process.put(:socket_key, socket_key)
         {:ok, Map.drop(state, [:otp_app,:name, :shard, :port, :address, :conn, :priority])}
       _ ->
+        Process.send_after(self(), {:tcp_closed, nil}, 500)
         Logger.error("Receiver #{name} couldn't establish a connection to address: #{address}, port: #{port}, shard: #{shard}, conn: #{conn}")
         {:ok, state}
     end

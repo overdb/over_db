@@ -125,6 +125,7 @@ defmodule OverDB.Connection do
             :gen_tcp.close(socket)
             {:error, max_nr-1}
           _ ->
+            :gen_tcp.close(socket)
             {conn_err?, sockets} = loop(shard, acc, opts)
             Enum.each(sockets, fn(port) -> :gen_tcp.close(port) end)
             conn_err?
@@ -159,14 +160,43 @@ defmodule OverDB.Connection do
   # this used only to fetch the ring(tokens) from all the nodes.
   @spec start_all(integer) :: list
   def start_all(otp_app, shard \\ 0) do
-    data_centers = Application.get_env(:over_db, otp_app)[:__DATA_CENTERS__]
-    for {_, nodes} <- data_centers do
-      for {address, port} <- nodes do
-        start(%{address: address, port: port, shard: shard, strategy: :sync})
-      end
-    end |> List.flatten
+    Application.get_env(:over_db, otp_app)[:__DATA_CENTERS__]
+    |> start_all_conns(shard)
   end
 
+  @spec start_all_conns(list, integer) :: tuple
+  def start_all_conns(data_centers, shard) when is_integer(shard) and is_list(data_centers) do
+    start_all_conns(data_centers,shard, {[], []})
+  end
+
+  @spec start_all_conns(list, integer, list) :: tuple
+  defp start_all_conns([{dc, nodes}|dcs], shard, acc) do
+    acc = start_dc_conns(dc,nodes, shard, acc)
+    start_all_conns(dcs, shard, acc)
+  end
+
+  @spec start_all_conns(list, integer, list) :: tuple
+  defp start_all_conns([], _, acc) do
+    acc
+  end
+
+  @spec start_dc_conns(atom, list, integer, tuple) :: tuple
+  defp start_dc_conns(dc, [{address, port}| nodes], shard, {dead, active}) do
+    acc =
+      case  start(%{address: address, port: port, shard: shard, strategy: :sync}) do
+        %__MODULE__{} = conn ->
+          {dead, [conn | active]}
+        err? ->
+          d = {err?, {dc, address, port}}
+          {[d | dead], active}
+      end
+    start_dc_conns(dc, nodes, shard, acc)
+  end
+
+  @spec start_dc_conns(atom, list, integer, tuple) :: tuple
+  defp start_dc_conns(_, _, _, acc) do
+    acc
+  end
   # ensure functions
 
   @spec ensure_ready(atom, t) :: t

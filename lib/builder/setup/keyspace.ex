@@ -6,6 +6,8 @@ defmodule OverDB.Builder.Setup.Keyspace do
   require Logger
 
   # TODO: creating the keyspace with quorum enabled, to make sure all the nodes got it.
+  # TODO: add error handler in case we couldn't establish connection or decode response because the connection got disconneted or blocked.
+  # same apply to table_setup.
   def setup(keyspace, otp_apps) do
     cql = build(keyspace)
     for otp_app <- otp_apps do
