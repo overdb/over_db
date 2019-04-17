@@ -12,18 +12,13 @@ defmodule OverDB.Ring.Helper do
   # refactoring the func with error handling (WIP).
   @spec get_all_ranges(atom) :: list
   def get_all_ranges(otp_app) do
-    {_dead, conns} = Connection.start_all(otp_app)
+    {dead, conns} = Connection.start_all(otp_app)
     payload =
       Query.create("SELECT rpc_address, tokens, scylla_nr_shards, scylla_msb_ignore FROM system.local")
       |> Query.new(%{})
-    for %Connection{socket: socket} <- conns do
-      Connection.push(payload, socket)
-      %Rows{page: [page]} = OverDB.Protocol.decode_response(socket, %{set: :list})
-      [rpc_address: rpc_address, tokens: tokens, scylla_nr_shards: nr_shards, scylla_msb_ignore: msg_ignore] = page
-      :gen_tcp.close(socket)
-      Enum.map(tokens, fn(token) -> {String.to_integer(token), {rpc_address, nr_shards, msg_ignore}} end)
-    end
-    |> List.flatten() |> :lists.usort() |> ranges()
+    {dead, vnodes} = pull_ranges_from_conns(conns, payload, {dead, []})
+    ranges = List.flatten(vnodes) |> :lists.usort() |> ranges()
+    {dead, ranges}
   end
 
   @spec build_ring(list, atom, atom) :: atom
@@ -146,7 +141,25 @@ defmodule OverDB.Ring.Helper do
     continuous_range(left, [ {{a, token}, prev_host_id} | acc], {{token, nil}, host_id})
   end
 
+  defp pull_ranges_from_conns([%Connection{socket: socket, address: address, port: port, data_center: dc} | conns], payload, {dead, vnodes}) do
+    response = Connection.push(payload, socket) |> Connection.sync_recv()
+    |> OverDB.Protocol.decode_frame(%{set: :list})
+    acc =
+      case response do
+        %Rows{page: [page]} ->
+          [rpc_address: rpc_address, tokens: tokens, scylla_nr_shards: nr_shards, scylla_msb_ignore: msg_ignore] = page
+          result = Enum.map(tokens, fn(token) -> {String.to_integer(token), {rpc_address, nr_shards, msg_ignore}} end)
+          {dead, [result|vnodes]}
+        err? ->
+          error = {err?, {dc, address, port}}
+          {{[error|dead]}, vnodes}
+      end
+    :gen_tcp.close(socket)
+    pull_ranges_from_conns(conns, payload, acc)
+  end
 
-
+  defp pull_ranges_from_conns([], _, acc) do
+    acc
+  end
 
 end

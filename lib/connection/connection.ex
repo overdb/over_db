@@ -9,9 +9,9 @@ defmodule OverDB.Connection do
   @timeout 5_000
 
 
-  defstruct [:socket, :options, :address, :port, :strategy]
+  defstruct [:socket, :options, :address, :port, :strategy, :data_center]
 
-  @type t :: %__MODULE__{socket: port, options: map , address: list, port: integer, strategy: atom}
+  @type t :: %__MODULE__{socket: port, options: map , address: list, port: integer, strategy: atom, data_center: atom}
 
 
   @spec start(map) :: t
@@ -76,7 +76,12 @@ defmodule OverDB.Connection do
     end
   end
 
-  @spec recv(port, atom) :: binary | atom
+  @spec sync_recv(port) :: binary | tuple
+  def sync_recv(socket) do
+    recv(socket, :sync)
+  end
+
+  @spec recv(port, atom) :: binary | tuple
   defp recv(socket, :sync) when is_port(socket) do
     case :gen_tcp.recv(socket, 9, @timeout) do
       {:ok, header} ->
@@ -95,7 +100,7 @@ defmodule OverDB.Connection do
     end
   end
 
-  @spec recv(port, atom) :: binary | atom
+  @spec recv(port, atom) :: binary | tuple
   defp recv(socket, _) when is_port(socket) do
     receive do
       {:tcp, _socket, buffer} ->
@@ -185,7 +190,7 @@ defmodule OverDB.Connection do
     acc =
       case  start(%{address: address, port: port, shard: shard, strategy: :sync}) do
         %__MODULE__{} = conn ->
-          {dead, [conn | active]}
+          {dead, [%{conn | data_center: dc} | active]}
         err? ->
           d = {err?, {dc, address, port}}
           {[d | dead], active}

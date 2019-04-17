@@ -171,7 +171,7 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
   # which mean the user will only have to pass only order senstive values_list,
   # or just a simple named_key map without mentioning the type, or even better a keyword_list.
 
-  @spec values(atom, map, map) :: list
+  @spec values(list, map, map) :: list
   defp values([], map, _opts) when is_map(map) do
     for {k, v} <- map, into: <<map_size(map)::16>> do
       k = to_string(k)
@@ -182,7 +182,7 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
   # this function handle the query_parameters for both unprepared and prepared.
   # it takes encoded_values_structure [{type, value}, etc], you can use it directly through the protocol
   # or better use OverDB QueryBuilder and let it do the work for you
-  @spec values(atom, list, map) :: list
+  @spec values(list, list, map) :: list
   defp values([], list, _opts) when is_list(list) do
     for value <- list, into: <<length(list)::16>> do
       query_data(value)
@@ -220,7 +220,7 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
           query_data(type, list[name])
         end
       :list ->
-        for {{_k, _t, _name, type}, element} <- Enum.zip(columns, list), into: [<<length(columns)::16>>] do
+        for {{_k, _t, _name, type}, element} <- Enum.zip(columns, list), into: <<length(columns)::16>> do
           query_data(type, element)
         end
     end
@@ -426,12 +426,12 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
 
   @spec data(atom, list) :: list
   defp data({:list, e_type}, data) when is_list(data) do
-    for element <- data, into: [<<length(data)::32>>], do: query_data(e_type, element)
+    for element <- data, into: <<length(data)::32>> , do: query_data(e_type, element)
   end
 
   @spec data(map, map) :: list
   defp data({:map, k_type, v_type}, data) when is_map(data) do
-    for {k, v} <- data, into: [<<map_size(data)::32>>], do: [query_data(k_type, k), query_data(v_type, v)]
+    for {k, v} <- data, into: <<map_size(data)::32>>, do: << query_data(k_type, k), query_data(v_type, v) >>
   end
 
   @spec data(tuple, list) :: list

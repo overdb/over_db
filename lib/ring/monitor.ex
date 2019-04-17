@@ -18,8 +18,8 @@ defmodule OverDB.Ring.Monitor do
   def handle_info(:all, state) do
     otp_app = state[:otp_app]
     module = Application.get_env(:over_db, otp_app)[:__RING__]
-    Helper.get_all_ranges(otp_app)
-    |> Helper.build_ring(module, otp_app)
+    {_dead, ranges} = Helper.get_all_ranges(otp_app)
+    Helper.build_ring(ranges, module, otp_app)
     {:noreply, state}
   end
 
