@@ -11,6 +11,7 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
   @default_consistency :one
   @default_page_size 5_000
   @null << 255, 255, 255, 255 >>
+  @unset_value << 255, 255, 255, 254 >>
   @ref_days 719528
   @intial_mask 0x00
   @unix_epoch_days 0x80000000
@@ -71,7 +72,7 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
       composite_partition_key(list, schema)
     else
       pk = hd(partition_key)
-      [data(schema.columns[pk][:type], list[pk])]
+      data(schema.columns[pk][:type], list[pk])
     end
   end
 
@@ -231,17 +232,22 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
     query_data(type, data)
   end
 
-  @spec query_data(atom | tuple, nil) :: binary
-  defp query_data(_type, nil) do
-    @null
-  end
-
 
   @spec query_data(atom | tuple, binary) :: list
   defp query_data(type, [{sign, data}]) when sign in [:=, :in, :<=, :>=, :>, :<, :+, :-, :++] do
       query_data(type, data)
   end
 
+  @spec query_data(atom | tuple, nil) :: binary
+  defp query_data(_type, nil) do
+    @null
+  end
+
+  @spec query_data(atom | tuple, atom) :: binary
+  defp query_data(_type, :unset_value) do
+    IO.puts("unseting")
+    @unset_value
+  end
 
   @spec query_data(atom | tuple, binary) :: list
   defp query_data(type, data) do
@@ -579,13 +585,13 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
   @spec component_partition_key(atom | tuple, term) :: list
   defp component_partition_key(type, value) do
     io = data(type, value)
-    [<<IO.iodata_length(io)::16>>, io, [0]]
+    <<IO.iodata_length(io)::16, io::binary, 0>>
   end
 
   @spec composite_partition_key(list, map) :: list
   defp composite_partition_key(list, schema) do
     columns = schema.columns
-    for pk <- schema.partition_key do
+    for pk <- schema.partition_key, into: <<>> do
       component_partition_key(columns[pk][:type], list[pk])
     end
   end

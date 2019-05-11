@@ -131,7 +131,6 @@ defmodule OverDB.Engine.Reporter do
 
   @spec handle_events(list, tuple, map) :: tuple
   def handle_events(events, _from, %{workers: workers, stream_ids: stream_ids} = state) do
-    IO.inspect({Process.get(:name), events})
     {payloads, workers, stream_ids} = workers_put(events, workers, stream_ids)
     state = Map.put(state, :workers, workers)
     state = Map.put(state, :stream_ids, stream_ids)

@@ -334,10 +334,8 @@ defmodule OverDB.Builder.Cql do
     case pk? do
       true ->
         Encoder.compute_partition_key(list, schema)
-        |> :erlang.list_to_binary()
         |> Murmur.create()
-      false -> false
-      nil -> nil
+      false_or_nil -> false_or_nil
     end
   end
 

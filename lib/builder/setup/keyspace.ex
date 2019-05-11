@@ -1,8 +1,7 @@
 defmodule OverDB.Builder.Setup.Keyspace do
 
   alias OverDB.Protocol.V4.Frames.Requests.Query
-  alias OverDB.Connection
-  alias OverDB.Protocol
+  alias OverDB.{Protocol, Connection}
   require Logger
 
   # TODO: creating the keyspace with quorum enabled, to make sure all the nodes got it.
@@ -14,10 +13,11 @@ defmodule OverDB.Builder.Setup.Keyspace do
       {_, nodes} = Application.get_env(:over_db, otp_app)[:__DATA_CENTERS__] |> Enum.random()
       {address , port} = Enum.random(nodes)
       %Connection{socket: socket} = Connection.start(%{address: address, port: port, shard: 0, strategy: :sync})
-      Query.create(cql, [])
+      response = Query.create(cql, [])
       |> Query.new()
       |> Connection.push(socket)
-      response = Protocol.decode_response(socket, %{})
+      |> Connection.sync_recv()
+      |> Protocol.decode_frame(%{})
       Logger.info("keyspace: #{inspect response}")
       :gen_tcp.close(socket)
     end
