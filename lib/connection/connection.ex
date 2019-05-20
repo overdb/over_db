@@ -6,7 +6,7 @@ defmodule OverDB.Connection do
   @async_active_true [packet: :raw, mode: :binary, active: true]
   @async_active_n [packet: :raw, mode: :binary, active: 32767]
   @async_active_once [packet: :raw, mode: :binary, active: :once]
-  @timeout 5_000
+  @timeout 10_000
 
 
   defstruct [:socket, :options, :address, :port, :strategy, :data_center]

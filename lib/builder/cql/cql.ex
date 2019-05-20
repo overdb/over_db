@@ -4,6 +4,10 @@ defmodule OverDB.Builder.Cql do
   alias OverDB.Builder.Helper.Murmur
   import String, only: [split: 3, upcase: 1, contains?: 2]
 
+  @spec build(map) :: tuple
+  def build(%{cql: _} = query) do
+    cql(query)
+  end
 
   @spec build(map) :: tuple
   def build(%{insert: _} = query) do
@@ -55,9 +59,16 @@ defmodule OverDB.Builder.Cql do
     {:stream, virtual_pk, values, cql} # range queries will be forced to :stream type. the virtual_pk enable the exectue engine to find the right shard.
   end
 
+  # Hardcoded CQL function # NOTE: intended for powerusers only.
+  @spec cql(map) :: tuple
+  defp cql(%{cql: cql, type: type, values: values, pk: pk, schema: schema}) do
+    pk = Encoder.compute_partition_key(pk, schema) |> Murmur.create()
+    {action, pk, values, cql}
+  end
+
   # select functions
   @spec select(map) :: tuple
-  def select(%{select: select, target: target, schema: schema} = query) when is_list(select) do
+  defp select(%{select: select, target: target, schema: schema} = query) when is_list(select) do
     schema = schema.__struct__
     select = Enum.sort(select)
     where = query[:where]
@@ -83,7 +94,7 @@ defmodule OverDB.Builder.Cql do
   # insert functions
 
   @spec insert(map) :: tuple
-  def insert(%{insert: insert, target: target, schema: schema}) when is_list(insert) do
+  defp insert(%{insert: insert, target: target, schema: schema}) when is_list(insert) do
     schema = schema.__struct__
     insert = Enum.sort(insert)
     values = insert(insert, schema)
@@ -103,7 +114,7 @@ defmodule OverDB.Builder.Cql do
   # Delete function
 
   @spec delete(map) :: tuple
-  def delete(%{delete: delete, target: target, where: where, schema: schema}) when is_list(delete) do
+  defp delete(%{delete: delete, target: target, where: where, schema: schema}) when is_list(delete) do
     schema = schema.__struct__
     delete = Enum.sort(delete)
     {values, cql} = where(where, schema)
@@ -121,7 +132,7 @@ defmodule OverDB.Builder.Cql do
 
   # update functions
   @spec update(map) :: tuple
-  def update(%{update: update, target: target, where: where, schema: schema}) do
+  defp update(%{update: update, target: target, where: where, schema: schema}) do
     schema = schema.__struct__
     update = Enum.sort(update)
     {where_values, where_cql} = where(where, schema)
@@ -243,7 +254,7 @@ defmodule OverDB.Builder.Cql do
         case column_names do
           [column] ->
             type = columns[:"#{column}"][:type]
-            { {{:list, type}, v}, "in(#{column})"}
+            { {{:list, type}, v}, column} # edited from in(column)
           [_hd | _tl] ->
             column_names = tuple_statement_sorter(column_names, schema)
             types = types(column_names, columns)

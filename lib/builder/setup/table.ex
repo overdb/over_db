@@ -9,16 +9,23 @@ defmodule OverDB.Builder.Setup.Table do
     for {keyspace, otp_apps} <- keyspaces  do
       cql = build(schema, keyspace)
       Enum.each(otp_apps, fn(otp_app) ->
-        {_, nodes} = Application.get_env(:over_db, otp_app)[:__DATA_CENTERS__] |> Enum.random()
-        {address , port} = Enum.random(nodes)
-        %Connection{socket: socket} = Connection.start(%{address: address, port: port, shard: 0, strategy: :sync})
-        response = Query.create(cql, [])
-        |> Query.new()
-        |> Connection.push(socket)
-        |> Connection.sync_recv()
-        |> Protocol.decode_frame(%{})
-        Logger.info("table: #{inspect response}")
-        :gen_tcp.close(socket)
+        dcs = Application.get_env(:over_db, otp_app)[:__DATA_CENTERS__]
+        if dcs do
+          {_, nodes} = dcs |> Enum.random()
+          {address , port} = Enum.random(nodes)
+          %Connection{socket: socket} = Connection.start(%{address: address, port: port, shard: 0, strategy: :sync})
+          response = Query.create(cql, [])
+          |> Query.new()
+          |> Connection.push(socket)
+          |> Connection.sync_recv()
+          |> Protocol.decode_frame(%{})
+          Logger.info("table: #{inspect response}")
+          :gen_tcp.close(socket)
+        else
+          Logger.error("Could not create table in the given keypsace: #{keyspace}
+            as no overdb configuration has been found for the following app: #{otp_app}.
+            Please make sure to recompile the project again.")
+        end
        end)
     end
   end

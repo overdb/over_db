@@ -245,7 +245,6 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
 
   @spec query_data(atom | tuple, atom) :: binary
   defp query_data(_type, :unset_value) do
-    IO.puts("unseting")
     @unset_value
   end
 

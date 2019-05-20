@@ -85,7 +85,7 @@ defmodule OverDB.Engine.Sender do
   @spec send_and_tell(tuple, list, tuple, integer) :: boolean
   defp send_and_tell(err, ids, {pid, _}, stream_id) do
     Helper.tell_workers(ids, :send?, err)
-    send(pid, {:drop, stream_id})
+    GenStage.cast(pid, {:drop, stream_id})
     false
   end
   @spec socket_send(port, binary) :: atom | tuple

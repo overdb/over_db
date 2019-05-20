@@ -17,8 +17,11 @@ defmodule OverDB.Builder.Query do
   end
 
   defmacro select(modules, select \\ @list_default) do
-
     Builder.build(:select, modules, select)
+  end
+
+  defmacro cql(modules, cql) do
+    Builder.build(:cql, modules, cql)
   end
 
   # TODO: not ready yet (for internal use only)
@@ -38,7 +41,7 @@ defmodule OverDB.Builder.Query do
     Builder.build(:assign, modules, assign)
   end
 
-  defmacro referance(modules, ref \\ :rand.uniform(9223372036854775807)) do
+  defmacro reference(modules, ref \\ :rand.uniform(9223372036854775807)) do
     Builder.build(:ref, modules, ref)
   end
 
@@ -78,4 +81,11 @@ defmodule OverDB.Builder.Query do
     Builder.build(:stream, modules, stream)
   end
 
+  defmacro values(modules, values) do
+    Builder.build(:values, modules, values)
+  end
+
+  defmacro pk(modules, pk) do
+    Builder.build(:pk, modules, pk)
+  end
 end
