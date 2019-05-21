@@ -43,7 +43,8 @@ defmodule OverDB.Protocol do
 
   @spec decode_stream(atom, binary, map) :: tuple
   def decode_stream(:stream, buffer, %{result_metadata: columns, opts: opts, row_count: row_count, columns_count: columns_count, old_buffer: old_buffer} = query_state) do
-    {rows_list, row_count, buffer} = Decoder.streamed_rows(row_count, columns_count, columns, old_buffer <> buffer, [], opts, opts[:function])
+    acc = query_state[:acc] || []
+    {rows_list, row_count, buffer} = Decoder.streamed_rows(row_count, columns_count, columns, old_buffer <> buffer, acc, opts, opts[:function])
     query_state = Map.put(query_state, :next, next?(row_count))
     query_state = Map.put(query_state, :row_count, row_count)
     query_state = Map.put(query_state, :old_buffer, buffer)
@@ -51,7 +52,8 @@ defmodule OverDB.Protocol do
   end
 
   def decode_stream_start(<<row_count::32-signed, buffer::binary>>, _, columns_count, paging_state, has_more_pages, %{result_metadata: columns, opts: opts}= query_state) do
-    {rows_list, row_count, buffer} = Decoder.streamed_rows(row_count, columns_count, columns, buffer, [], opts, opts[:function])
+    acc = query_state[:acc] || []
+    {rows_list, row_count, buffer} = Decoder.streamed_rows(row_count, columns_count, columns, buffer, acc, opts, opts[:function])
     query_state = Map.put(query_state, :row_count, row_count)
     query_state = Map.put(query_state, :columns_count, columns_count)
     query_state = Map.put(query_state, :old_buffer, buffer)

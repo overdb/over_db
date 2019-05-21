@@ -63,7 +63,7 @@ defmodule OverDB.Builder.Cql do
   @spec cql(map) :: tuple
   defp cql(%{cql: cql, type: type, values: values, pk: pk, schema: schema}) do
     pk = Encoder.compute_partition_key(pk, schema) |> Murmur.create()
-    {action, pk, values, cql}
+    {type, pk, values, cql}
   end
 
   # select functions
