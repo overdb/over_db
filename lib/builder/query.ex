@@ -89,7 +89,7 @@ defmodule OverDB.Builder.Query do
     Builder.build(:pk, modules, pk)
   end
 
-  defmacro pk(modules, type) do
+  defmacro type(modules, type) do
     Builder.build(:type, modules, type)
   end
 end
