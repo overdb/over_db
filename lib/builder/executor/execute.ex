@@ -164,7 +164,7 @@ defmodule OverDB.Builder.Executor.Execute do
   defp result_metadata_generator(select, schema, target) do
     [keyspace, table] = String.split(target, ["."])
     columns = schema.__struct__.columns
-    for column_name <- Enum.sort(select) do
+    for column_name <- select do
       type = columns[column_name][:type]
       {keyspace, table, column_name, type}
     end
