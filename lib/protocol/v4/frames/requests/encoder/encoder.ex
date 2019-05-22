@@ -446,14 +446,14 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
 
   @spec data(tuple, list) :: list
   defp data({:tuple, types}, data) when is_list(data) do
-    for {type, element} <- Enum.zip(types, data) do
+    for {type, element} <- Enum.zip(types, data), into: <<>> do
       query_data(type, element)
     end
   end
 
   @spec data(tuple, list) :: list
   defp data({:tuple, types}, data) when is_tuple(data) do
-    for {type, element} <- Enum.zip(types, Tuple.to_list(data)) do
+    for {type, element} <- Enum.zip(types, Tuple.to_list(data)), into: <<>> do
       query_data(type, element)
     end
   end
