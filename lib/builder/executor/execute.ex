@@ -135,6 +135,7 @@ defmodule OverDB.Builder.Executor.Execute do
   end
 
   defp query_state?(:stream, %{select: select, schema: schema, target: target}, assign, opts) do
+    select = if opts[:sort_select?], do: Enum.sort(select), else: select
     result_metadata = result_metadata_generator(select, schema, target)
     %{type: :stream ,result_metadata: result_metadata, prepared: false, opts: Map.drop(opts, [:skip_metadata?])}
     |> assign(assign)
