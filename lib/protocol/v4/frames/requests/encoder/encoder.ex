@@ -460,7 +460,7 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
 
   @spec data(tuple, list) :: list
   defp data({:udt, fields}, data) when is_map(data) do
-    for {name, type} <- fields do
+    for {name, type} <- fields, into: <<>> do
       query_data(type, Map.get(data, name))
     end
   end
