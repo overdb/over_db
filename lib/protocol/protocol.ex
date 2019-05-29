@@ -1,12 +1,11 @@
 defmodule OverDB.Protocol do
 
-  # TODO: replacing Map.put in decode functions(all exept decode_start) to %{map | key: value}
   @type responses :: Result.t | Error.t | Ready.t | Event.t | Supported.t
 
   alias OverDB.Protocol.V4.Frames.{Frame, Responses.Decoder, Responses.Result, Responses.Error, Responses.Event, Responses.Ready, Responses.Supported, Responses.Result.Prepared, Responses.Result.Ignore}
 
   @spec decode_stream(binary, map) :: tuple
-  def decode_stream(buffer,  %{next: next, type: :stream} = query_state) do
+  def decode_stream(buffer, %{next: next, type: :stream} = query_state) do
     decode_stream(next, buffer, query_state)
   end
 
@@ -17,7 +16,7 @@ defmodule OverDB.Protocol do
   end
 
   @spec decode_stream(atom, binary, map) :: tuple
-  def decode_stream(:start, buffer, query_state) do
+  defp decode_stream(:start, buffer, query_state) do
     old_buffer = query_state[:old_buffer]
     current_buffer =
       if old_buffer do
@@ -26,8 +25,6 @@ defmodule OverDB.Protocol do
         buffer
       end
     case Decoder.streamed_result(current_buffer) do
-      {:ok, columns_count, has_more_pages, false, buffer} ->
-        decode_stream_start(buffer, current_buffer, columns_count, false, has_more_pages, query_state)
       {:ok, _columns_count, _, <<>>, buffer} ->
         query_state = Map.put(query_state, :next, :start)
         query_state = Map.put(query_state, :old_buffer, buffer)
@@ -42,40 +39,50 @@ defmodule OverDB.Protocol do
   end
 
   @spec decode_stream(atom, binary, map) :: tuple
-  def decode_stream(:stream, buffer, %{result_metadata: columns, opts: opts, row_count: row_count, columns_count: columns_count, old_buffer: old_buffer} = query_state) do
+  defp decode_stream(:stream, buffer, %{result_metadata: columns, opts: opts, row_count: row_count, columns_count: columns_count, old_buffer: old_buffer} = query_state) do
     acc = query_state[:acc] || []
-    {rows_list, row_count, buffer} = Decoder.streamed_rows(row_count, columns_count, columns, old_buffer <> buffer, acc, opts, opts[:function])
-    query_state = Map.put(query_state, :next, next?(row_count))
-    query_state = Map.put(query_state, :row_count, row_count)
-    query_state = Map.put(query_state, :old_buffer, buffer)
-    {rows_list, query_state} # rows_list may be a result of %Compute as well
+    {rows_list, current_row_count, buffer} = Decoder.streamed_rows(row_count, columns_count, columns, old_buffer <> buffer, acc, opts, opts[:function])
+    query_state = %{query_state | next: next?(current_row_count), row_count: current_row_count, old_buffer: buffer}
+    case row_count do
+      ^current_row_count ->
+        # ignore because both row_count and current_row_count are equal,
+        Ignore.create(query_state, :stream)
+      _ ->
+        {rows_list, query_state} # rows_list might be a result of %Compute as well
+    end
   end
 
-  def decode_stream_start(<<row_count::32-signed, buffer::binary>>, _, columns_count, paging_state, has_more_pages, %{result_metadata: columns, opts: opts}= query_state) do
+  # if this function got invoked and row_count is 0, then it indicates it's the end of buffer and also the result is empty list.
+  # note: in-case of supporting cql-payload, the protocol functions should take flags as an input to know when to decode payload bytes-maps.
+  defp decode_stream_start(<<row_count::32-signed, buffer::binary>>, _, columns_count, paging_state, has_more_pages, %{result_metadata: columns, opts: opts}= query_state) do
     acc = query_state[:acc] || []
-    {rows_list, row_count, buffer} = Decoder.streamed_rows(row_count, columns_count, columns, buffer, acc, opts, opts[:function])
-    query_state = Map.put(query_state, :row_count, row_count)
-    query_state = Map.put(query_state, :columns_count, columns_count)
-    query_state = Map.put(query_state, :old_buffer, buffer)
-    query_state = Map.put(query_state, :next, :stream)
-    query_state = Map.put(query_state, :paging_state, paging_state)
-    query_state = Map.put(query_state, :has_more_pages, has_more_pages)
-    {rows_list, query_state} # rows_list may be a result of %Compute as well
+    {rows_list, current_row_count, buffer} = Decoder.streamed_rows(row_count, columns_count, columns, buffer, acc, opts, opts[:function])
+    query_state = Map.merge(
+      query_state,
+      %{row_count: current_row_count, columns_count: columns_count, old_buffer: buffer, next: :stream, paging_state: paging_state, has_more_pages: has_more_pages}
+    )
+    cond do
+      current_row_count != row_count or row_count == 0 ->
+        {rows_list, query_state} # rows_list may be a result of %Compute as well
+      true ->
+        # ignore because both row_count and current_row_count are equal and not zero,
+        Ignore.create(query_state, :stream)
+    end
   end
 
-  def decode_stream_start(_, current_buffer, _column_count, _paging_state, _has_more_pages, query_state) do
+  defp decode_stream_start(_, current_buffer, _column_count, _paging_state, _has_more_pages, query_state) do
     query_state = Map.put(query_state, :next, :start)
     query_state = Map.put(query_state, :old_buffer, current_buffer)
     Ignore.create(query_state, :start)
   end
 
   @spec next?(integer) :: atom
-  def next?(0) do
+  defp next?(0) do
     :ended
   end
 
   @spec next?(term) :: atom
-  def next?(_) do
+  defp next?(_) do
     :stream
   end
 
