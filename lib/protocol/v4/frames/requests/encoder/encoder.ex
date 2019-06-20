@@ -1,6 +1,7 @@
 defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
 
   @moduledoc false
+  # TODO: convert lists resut to binary
 
   use Bitwise
 
@@ -551,6 +552,9 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
   @spec paging_state?(binary) :: list
   defp paging_state?(v) when is_binary(v), do: [<<byte_size(v)::32>>, v]
 
+  @spec paging_state?(list) :: list
+  defp paging_state?(v) when is_list(v), do: [<<length(v)::32>>, v]
+
   @spec set_query_flag([]) :: integer
   defp set_query_flag([]), do: 0
 
@@ -563,7 +567,7 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
   @spec set_query_flag(map) :: integer
   defp set_query_flag(map) when is_map(map), do: 65
 
-  @spec set_flag(integer, atom, boolean) :: integer
+  @spec set_flag(integer, atom, boolean | binary) :: integer
   defp set_flag(integer, atom, boolean) when is_atom(atom), do: set_flag(integer, atom_to_flag?(atom), boolean)
 
   @spec set_flag(integer, integer, boolean) :: integer
@@ -572,8 +576,8 @@ defmodule OverDB.Protocol.V4.Frames.Requests.Encoder do
   @spec set_flag(integer, integer, boolean) :: integer
   defp set_flag(mask, _int, false), do: mask
 
-  @spec set_flag(integer, integer, boolean) :: integer
-  defp set_flag(mask, int, true), do:  mask ||| int
+  @spec set_flag(integer, integer, boolean | binary | list) :: integer
+  defp set_flag(mask, int, _true_or_paging_state), do:  mask ||| int
 
   # check https://en.wikipedia.org/wiki/Universally_unique_identifier for more details
   @spec layout_uuid(binary) :: binary
