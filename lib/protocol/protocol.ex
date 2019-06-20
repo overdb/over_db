@@ -11,8 +11,8 @@ defmodule OverDB.Protocol do
 
   @spec decode_stream(binary, map) :: map
   def decode_stream(buffer, %{old_buffer: old_buffer, type: type} = q_s) when type != :stream do
-    q_s = Map.put(q_s, old_buffer, old_buffer <> buffer)
-    Ignore.create(q_s, type)
+    Map.put(q_s, :old_buffer, old_buffer <> buffer)
+    |> Ignore.create(type)
   end
 
   @spec decode_stream(atom, binary, map) :: tuple
@@ -26,14 +26,12 @@ defmodule OverDB.Protocol do
       end
     case Decoder.streamed_result(current_buffer) do
       {:ok, _columns_count, _, <<>>, buffer} ->
-        query_state = Map.put(query_state, :next, :start)
-        query_state = Map.put(query_state, :old_buffer, buffer)
+        query_state = Map.merge(query_state, %{next: :start, old_buffer: buffer})
         Ignore.create(query_state, :start)
       {:ok, columns_count, has_more_pages, paging_state, buffer} ->
         decode_stream_start(buffer, current_buffer, columns_count, paging_state, has_more_pages, query_state)
       {:short , buffer} ->
-        query_state = Map.put(query_state, :next, :start)
-        query_state = Map.put(query_state, :old_buffer, buffer)
+        query_state = Map.merge(query_state, %{next: :start, old_buffer: buffer})
         Ignore.create(query_state, :start)
     end
   end
@@ -71,9 +69,8 @@ defmodule OverDB.Protocol do
   end
 
   defp decode_stream_start(_, current_buffer, _column_count, _paging_state, _has_more_pages, query_state) do
-    query_state = Map.put(query_state, :next, :start)
-    query_state = Map.put(query_state, :old_buffer, current_buffer)
-    Ignore.create(query_state, :start)
+    Map.merge(query_state, %{next: :start, old_buffer: current_buffer})
+    |> Ignore.create(:start)
   end
 
   @spec next?(integer) :: atom
