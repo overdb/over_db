@@ -151,7 +151,7 @@ defmodule OverDB.Builder.Executor.Execute do
   end
 
   defp assign(query_state, assign) do
-    Enum.reduce(assign, query_state, fn({k,v}, acc) -> Map.put(acc, k, v) end)
+    assign |> Enum.into(query_state)
   end
 
   defp result_metadata_generator([], schema, target) do
