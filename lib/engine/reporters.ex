@@ -5,7 +5,8 @@ defmodule OverDB.Engine.Reporter do
   alias OverDB.Protocol.V4.Frames.Requests.Batch
   require Logger
 
-  # TODO: : refactor the engine to have thousands of reporters per given stream_ids,
+  # TODO: : refactor from Map.put to more optmizied logic. we generate Workers as
+  # list |> Enum.into(worker_map) 
   # TODO: we should move the expensive work from start_link and init/handle_cou to handle_countiune()
   @spec start_link(Keyword.t) :: tuple
   def start_link(state) do
