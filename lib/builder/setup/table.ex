@@ -13,14 +13,20 @@ defmodule OverDB.Builder.Setup.Table do
         if dcs do
           {_, nodes} = dcs |> Enum.random()
           {address , port} = Enum.random(nodes)
-          %Connection{socket: socket} = Connection.start(%{address: address, port: port, shard: 0, strategy: :sync})
-          response = Query.create(cql, [])
-          |> Query.new()
-          |> Connection.push(socket)
-          |> Connection.sync_recv()
-          |> Protocol.decode_frame(%{})
-          Logger.info("table: #{inspect response}")
-          :gen_tcp.close(socket)
+          case Connection.start(%{address: address, port: port, shard: 0, strategy: :sync}) do
+            %Connection{socket: socket} ->
+              response = Query.create(cql, [])
+              |> Query.new()
+              |> Connection.push(socket)
+              |> Connection.sync_recv()
+              |> Protocol.decode_frame(%{})
+              Logger.info("table: #{inspect response}")
+              :gen_tcp.close(socket)
+            _ ->
+             raise "Make sure scylla cluster is alive at compilation to init the required tables"
+          end
+
+
         else
           Logger.error("Could not create table in the given keypsace: #{keyspace}
             as no overdb configuration has been found for the following app: #{otp_app}.

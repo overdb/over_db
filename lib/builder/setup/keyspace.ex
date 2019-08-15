@@ -5,7 +5,6 @@ defmodule OverDB.Builder.Setup.Keyspace do
   require Logger
 
   # TODO: creating the keyspace with quorum enabled, to make sure all the nodes got it.
-  # TODO: add error handler in case we couldn't establish connection or decode response because the connection got disconneted or blocked.
   # same apply to table_setup.
   def setup(keyspace, otp_apps) do
     cql = build(keyspace)
@@ -14,14 +13,18 @@ defmodule OverDB.Builder.Setup.Keyspace do
       if dcs do
         {_, nodes} = dcs |> Enum.random()
         {address , port} = Enum.random(nodes)
-        %Connection{socket: socket} = Connection.start(%{address: address, port: port, shard: 0, strategy: :sync})
-        response = Query.create(cql, [])
-        |> Query.new()
-        |> Connection.push(socket)
-        |> Connection.sync_recv()
-        |> Protocol.decode_frame(%{})
-        Logger.info("keyspace: #{inspect response}")
-        :gen_tcp.close(socket)
+        case Connection.start(%{address: address, port: port, shard: 0, strategy: :sync}) do
+          %Connection{socket: socket} ->
+            response = Query.create(cql, [])
+            |> Query.new()
+            |> Connection.push(socket)
+            |> Connection.sync_recv()
+            |> Protocol.decode_frame(%{})
+            Logger.info("keyspace: #{inspect response}")
+            :gen_tcp.close(socket)
+          _ ->
+           raise "Make sure scylla cluster is alive at compilation to init the required keyspace"
+        end
       else
         Logger.error("Could not create keyspace: #{keyspace}
           as no overdb configuration has been found for the following app: #{otp_app}.
