@@ -20,7 +20,7 @@ defmodule OverDB.Ring do
 
   def gen_lookup_primary(ranges, otp_app) do
     for { {range_a, range_b} , host_id} <- ranges do
-      guard?(range_a,range_a, host_id, otp_app)
+      guard?(range_a,range_b, host_id, otp_app)
     end
   end
 
