@@ -1,7 +1,7 @@
 defmodule OverDB.Ring.Monitor do
 
   alias OverDB.Ring.Helper
-
+  require Logger
   use GenServer
 
   def start_link(args) do
@@ -18,7 +18,10 @@ defmodule OverDB.Ring.Monitor do
   def handle_info(:all, state) do
     otp_app = state[:otp_app]
     module = Application.get_env(:over_db, otp_app)[:__RING__]
-    {_dead, ranges} = Helper.get_all_ranges(otp_app)
+    {dead, ranges} = Helper.get_all_ranges(otp_app)
+    if dead != [] do
+      Logger.warn("dead scylla node(s): #{inspect dead}, please make sure all of them are started probably, and then recompile chronicle again")
+    end
     Helper.build_ring(ranges, module, otp_app)
     {:noreply, state}
   end

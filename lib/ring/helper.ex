@@ -14,7 +14,7 @@ defmodule OverDB.Ring.Helper do
   def get_all_ranges(otp_app) do
     {dead, conns} = Connection.start_all(otp_app)
     payload =
-      Query.create("SELECT rpc_address, tokens, scylla_nr_shards, scylla_msb_ignore FROM system.local")
+      Query.create("SELECT rpc_address, tokens FROM system.local")
       |> Query.new(%{})
     {dead, vnodes} = pull_ranges_from_conns(conns, payload, {dead, []})
     ranges = List.flatten(vnodes) |> :lists.usort() |> ranges()
@@ -141,14 +141,17 @@ defmodule OverDB.Ring.Helper do
     continuous_range(left, [ {{a, token}, prev_host_id} | acc], {{token, nil}, host_id})
   end
 
-  defp pull_ranges_from_conns([%Connection{socket: socket, address: address, port: port, data_center: dc} | conns], payload, {dead, vnodes}) do
+  defp pull_ranges_from_conns([%Connection{socket: socket, address: address, port: port, data_center: dc, options:
+   %{SCYLLA_NR_SHARDS: [nr_shards],SCYLLA_SHARDING_IGNORE_MSB: [msb_ignore]}} | conns], payload, {dead, vnodes}) do
+     nr_shards = String.to_integer(nr_shards)
+     msb_ignore = String.to_integer(msb_ignore)
     response = Connection.push(payload, socket) |> Connection.sync_recv()
     |> OverDB.Protocol.decode_frame(%{set: :list})
     acc =
       case response do
         %Rows{page: [page]} ->
-          [rpc_address: rpc_address, tokens: tokens, scylla_nr_shards: nr_shards, scylla_msb_ignore: msg_ignore] = page
-          result = Enum.map(tokens, fn(token) -> {String.to_integer(token), {rpc_address, nr_shards, msg_ignore}} end)
+          [rpc_address: rpc_address, tokens: tokens] = page
+          result = Enum.map(tokens, fn(token) -> {String.to_integer(token), {rpc_address, nr_shards, msb_ignore}} end)
           {dead, [result|vnodes]}
         err? ->
           error = {err?, {dc, address, port}}
