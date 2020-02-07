@@ -19,8 +19,8 @@ defmodule OverDB.Ring do
   end
 
   def gen_lookup_primary(ranges, otp_app) do
-    for { range , host_id} <- ranges do
-      guard?(range, host_id, otp_app)
+    for { {range_a, range_b} , host_id} <- ranges do
+      guard?(range_a,range_a, host_id, otp_app)
     end
   end
 
@@ -65,7 +65,7 @@ defmodule OverDB.Ring do
       end
     end
   end
-  def guard?({@min_token, @max_token}, {{a, b, c, d}, nr, ig} = host_id, otp_app) do
+  def guard?(range_a, range_b, {{a, b, c, d}, nr, ig} = host_id, otp_app) when range_a == @min_token and range_b == @max_token do
     ring_key = :"#{otp_app}_#{a}.#{b}.#{c}.#{d}"
     quote do
       def lookup_primary(token) when is_integer(token) and token >= unquote(@min_token) and token <= unquote(@max_token) do
@@ -77,38 +77,38 @@ defmodule OverDB.Ring do
     end
   end
 
-  def guard?({@min_token, b}, {{a, b, c, d}, nr, ig} = host_id, otp_app) do
+  def guard?(range_a, range_b, {{a, b, c, d}, nr, ig} = host_id, otp_app) when range_a == @min_token do
     ring_key = :"#{otp_app}_#{a}.#{b}.#{c}.#{d}"
     quote do
-      def lookup_primary(token) when is_integer(token) and token >= unquote(@min_token) and token <= unquote(b) do
-        {unquote(b)+1, unquote(Macro.escape(host_id))}
+      def lookup_primary(token) when is_integer(token) and token >= unquote(@min_token) and token <= unquote(range_b) do
+        {unquote(range_b)+1, unquote(Macro.escape(host_id))}
       end
-      def lookup_primary_atom(token) when is_integer(token) and token >= unquote(@min_token) and token <= unquote(b) do
-        {unquote(b)+1, {unquote(ring_key), unquote(nr), unquote(ig)}}
+      def lookup_primary_atom(token) when is_integer(token) and token >= unquote(@min_token) and token <= unquote(range_b) do
+        {unquote(range_b)+1, {unquote(ring_key), unquote(nr), unquote(ig)}}
       end
     end
   end
 
-  def guard?({a, @max_token}, {{a, b, c, d}, nr, ig} = host_id, otp_app) do
+  def guard?(range_a, range_b, {{a, b, c, d}, nr, ig} = host_id, otp_app) when range_b = @max_token do
     ring_key = :"#{otp_app}_#{a}.#{b}.#{c}.#{d}"
     quote do
-      def lookup_primary(token) when is_integer(token) and token > unquote(a) and token <= unquote(@max_token) do
+      def lookup_primary(token) when is_integer(token) and token > unquote(range_a) and token <= unquote(@max_token) do
         {unquote(@min_token), unquote(Macro.escape(host_id))}
       end
-      def lookup_primary_atom(token) when is_integer(token) and token > unquote(a) and token <= unquote(@max_token) do
+      def lookup_primary_atom(token) when is_integer(token) and token > unquote(range_a) and token <= unquote(@max_token) do
         {unquote(@min_token), {unquote(ring_key), unquote(nr), unquote(ig)}}
       end
     end
   end
 
-  def guard?({a, b}, {{a, b, c, d}, nr, ig} = host_id, otp_app) do
+  def guard?(range_a, range_b, {{a, b, c, d}, nr, ig} = host_id, otp_app) do
     ring_key = :"#{otp_app}_#{a}.#{b}.#{c}.#{d}"
     quote do
-      def lookup_primary(token) when is_integer(token) and token > unquote(a) and token <= unquote(b) do
-        {unquote(b)+1, unquote(Macro.escape(host_id))}
+      def lookup_primary(token) when is_integer(token) and token > unquote(range_a) and token <= unquote(range_b) do
+        {unquote(range_b)+1, unquote(Macro.escape(host_id))}
       end
-      def lookup_primary_atom(token) when is_integer(token) and token > unquote(a) and token <= unquote(b) do
-        {unquote(b)+1, {unquote(ring_key), unquote(nr), unquote(ig)}}
+      def lookup_primary_atom(token) when is_integer(token) and token > unquote(range_a) and token <= unquote(range_b) do
+        {unquote(range_b)+1, {unquote(ring_key), unquote(nr), unquote(ig)}}
       end
     end
   end
