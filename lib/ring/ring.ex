@@ -89,7 +89,7 @@ defmodule OverDB.Ring do
     end
   end
 
-  def guard?(range_a, range_b, {{a, b, c, d}, nr, ig} = host_id, otp_app) when range_b = @max_token do
+  def guard?(range_a, range_b, {{a, b, c, d}, nr, ig} = host_id, otp_app) when range_b == @max_token do
     ring_key = :"#{otp_app}_#{a}.#{b}.#{c}.#{d}"
     quote do
       def lookup_primary(token) when is_integer(token) and token > unquote(range_a) and token <= unquote(@max_token) do
