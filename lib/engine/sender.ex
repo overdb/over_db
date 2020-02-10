@@ -37,19 +37,18 @@ defmodule OverDB.Engine.Sender do
     {:automatic, state}
   end
 
-  @spec handle_info(tuple, port) :: tuple
+  @spec handle_info(tuple, port | nil) :: tuple
   def handle_info(:new_socket, state) do
     socket = FastGlobal.get(Process.get(:socket_key))
-    cond do
-      is_nil(socket) ->
-        Process.send_after(self(), :new_socket, 1000)
-        {:noreply, [], state}
-      is_list(socket) ->
-        {:noreply,[], :erlang.list_to_port(socket)}
-      true ->
-        # this is kinda a joke from receiver :) as it's not suppose to happen.
-        {:noreply, [], state}
-    end
+    state =
+      cond do
+        is_nil(socket) ->
+          Process.send_after(self(), :new_socket, 1000)
+          nil
+        true ->
+          :erlang.list_to_port(socket)
+      end
+    {:noreply, [], state}
     # we dont know if the socket if nil or not. as we will ask for new socket only if send request failed or after the init.
     # for now the Reciever is GenServer as we dont want it to subscribe to a lot of senders for no reason.
     # # TODO: check if thousands of subscribation is a bottleneck on reciever, if not, then we can move Receiver to GenStage and
