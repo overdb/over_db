@@ -33,16 +33,16 @@ defmodule OverDB.Ring do
         lookup_replicas(b, [primary])
       end
       def lookup_replicas(token) do
-        {b, primary} = lookup_primary(token)
+        {b, primary} = lookup_primary_atom(token)
         lookup_replicas(b, [primary])
       end
       def lookup_replicas(nil, primary_replica) do
         primary_replica
       end
       def lookup_replicas(start, replicas) do
-        {next, host_id_rf_2} = lookup_primary(start)
+        {next, ring_key_rf_2} = lookup_primary_atom(start)
         # min_token, rf2
-        lookup_replicas(next, [host_id_rf_2 | replicas], start)
+        lookup_replicas(next, [ring_key_rf_2 | replicas], start)
       end
       def lookup_replicas(b, replicas, start) when b == start  do
         :lists.reverse(replicas)  # we should break from here.
@@ -51,15 +51,15 @@ defmodule OverDB.Ring do
         # the header will be the primary replica and the tail will contain the possible seconadry replicas :)
       end
       def lookup_replicas(b, replicas, start) do
-        {next, host_id_rf_x} = lookup_primary(b) # this should run .. # host_id_rf_x may be the primary_replica if next == start
+        {next, ring_key_rf_x} = lookup_primary_atom(b) # this should run .. # ring_key_rf_x may be the primary_replica if next == start
         # but we dont care as we are not going to add it to replicas list...
-        # add host_id_rf_x to replicas if it does not already exist
+        # add ring_key_rf_x to replicas if it does not already exist
         # then we run lookup_replicas again
         replicas =
-          if Enum.any?(replicas, fn(replica) -> replica == host_id_rf_x end) do
+          if Enum.any?(replicas, fn(replica) -> replica == ring_key_rf_x end) do
             replicas
           else
-            [host_id_rf_x | replicas]
+            [ring_key_rf_x | replicas]
           end
         lookup_replicas(next, replicas, start)
       end
