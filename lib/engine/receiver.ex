@@ -22,16 +22,16 @@ defmodule OverDB.Engine.Receiver do
 
   @spec init(map) :: tuple
   def init(%{otp_app: otp_app,priority: priority, name: name, address: address, port: port, shard: shard, conn: conn} = state) do
+    socket_key = :"#{otp_app}_#{address}_#{shard}_#{conn}"
+    Process.put(:socket_key, socket_key)
     Process.put(:info?, {address, port, shard})
     Process.flag(:priority, priority)
     case Connection.start(state) do
       %Connection{socket: socket} ->
         # pattern matching with Connection struct is the easiet way to verify if the connection started or not.
         # all the failover logic is going to move to handle_continue as soon as we support it.
-        socket_key = :"#{otp_app}_#{address}_#{shard}_#{conn}"
         port_as_list = :erlang.port_to_list(socket)
         FastGlobal.put(socket_key, port_as_list)
-        Process.put(:socket_key, socket_key)
         {:ok, Map.drop(state, [:otp_app,:name, :shard, :port, :address, :conn, :priority])}
       _ ->
         Process.send_after(self(), {:tcp_closed, nil}, 500)
