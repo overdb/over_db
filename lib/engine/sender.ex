@@ -38,7 +38,7 @@ defmodule OverDB.Engine.Sender do
   end
 
   @spec handle_info(tuple, port | nil) :: tuple
-  def handle_info(:new_socket, state) do
+  def handle_info(:new_socket, _state) do
     socket = FastGlobal.get(Process.get(:socket_key))
     state =
       cond do
