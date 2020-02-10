@@ -30,14 +30,14 @@ defmodule OverDB.Builder.Executor do
 
       if @counter do
         def counter(query) when is_map(query) do
-          Execute.in_batch(query,:rand.uniform(@conns), :c, :rand.uniform(@unlogged), @ring)
+          Execute.in_batch(query,:rand.uniform(@conns), :c, :rand.uniform(@counter), @ring)
         end
       end
 
       if @reporters do
         def query(query) when is_map(query) do
           Execute.alone(query,:rand.uniform(@conns), @ring)
-        end      
+        end
       end
 
     end
